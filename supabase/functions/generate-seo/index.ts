@@ -68,6 +68,80 @@ function parseModelJson(raw: string) {
   return JSON.parse(text);
 }
 
+const TITLE_LIMIT = 60;
+const DESC_LIMIT = 160;
+const TLDR_MIN = 35;
+const TLDR_MAX = 65;
+
+// Russian number words, so "больше десяти продуктов" in the article counts as
+// support for "10+" in the summary. Without this the hallucination check
+// fires on perfectly faithful paraphrases.
+const NUMBER_WORDS: Record<string, string> = {
+  ноль: '0', один: '1', одна: '1', два: '2', две: '2', три: '3', четыре: '4',
+  пять: '5', шесть: '6', семь: '7', восемь: '8', девять: '9', десять: '10',
+  одиннадцать: '11', двенадцать: '12', пятнадцать: '15', двадцать: '20',
+  тридцать: '30', сорок: '40', пятьдесят: '50', сто: '100', тысяча: '1000',
+  первый: '1', второй: '2', третий: '3', десяти: '10', двух: '2', трёх: '3',
+  трех: '3', пяти: '5', семи: '7', восьми: '8', девяти: '9', шести: '6',
+};
+
+/** Every number the article can legitimately support. */
+function articleNumbers(content: string): Set<string> {
+  const found = new Set(content.match(/\d+/g) ?? []);
+  const lower = content.toLowerCase();
+  for (const [word, digit] of Object.entries(NUMBER_WORDS)) {
+    if (lower.includes(word)) found.add(digit);
+  }
+  return found;
+}
+
+interface Generated {
+  seo_title: string;
+  seo_description: string;
+  focus_keyword: string;
+  keywords: string[];
+  tldr: string;
+  faq: Array<{ question: string; answer: string }>;
+}
+
+/**
+ * Check the model's output against the rules that are objectively verifiable:
+ * SERP length limits, TL;DR length, and — the one that actually matters —
+ * that no figure appears in the metadata which the article doesn't support.
+ * A fabricated number published under the author's name is far worse than an
+ * awkward title, so it's worth a retry.
+ */
+function validate(out: Generated, content: string): string[] {
+  const problems: string[] = [];
+
+  if (out.seo_title.length > TITLE_LIMIT) {
+    problems.push(`seo_title ${out.seo_title.length} символов — сократи до ${TITLE_LIMIT}`);
+  }
+  if (out.seo_description.length > DESC_LIMIT) {
+    problems.push(
+      `seo_description ${out.seo_description.length} символов — сократи до ${DESC_LIMIT}`,
+    );
+  }
+  const words = out.tldr.trim() ? out.tldr.trim().split(/\s+/).length : 0;
+  if (words < TLDR_MIN || words > TLDR_MAX) {
+    problems.push(`tldr ${words} слов — нужно 40-60`);
+  }
+  if (!out.faq.length) problems.push('faq пустой — нужно 3-5 пар вопрос-ответ');
+
+  const allowed = articleNumbers(content);
+  const used = new Set(
+    (out.tldr + ' ' + out.seo_description + ' ' + out.faq.map(f => f.answer).join(' '))
+      .match(/\d+/g) ?? [],
+  );
+  // Single digits are usually enumeration ("3 принципа"), not claims.
+  const invented = [...used].filter(n => n.length > 1 && !allowed.has(n));
+  if (invented.length) {
+    problems.push(`числа ${invented.join(', ')} отсутствуют в статье — убери или исправь`);
+  }
+
+  return problems;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
@@ -115,54 +189,81 @@ Deno.serve(async (req) => {
       return json({ error: 'Нужны заголовок и текст статьи' }, 400);
     }
 
-    // ── Generate ─────────────────────────────────────────────────────────
-    const aiRes = await fetch(COMET_ENDPOINT, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 2000,
-        temperature: 0.4,
-        messages: [{ role: 'user', content: buildPrompt(title, content, category ?? '') }],
-      }),
-    });
+    // ── Generate, then verify, then retry once if the rules were broken ──
+    const messages: Array<{ role: string; content: string }> = [
+      { role: 'user', content: buildPrompt(title, content, category ?? '') },
+    ];
 
-    if (!aiRes.ok) {
-      const detail = await aiRes.text();
-      console.error('CometAPI error', aiRes.status, detail.slice(0, 500));
-      return json({ error: `Модель вернула ${aiRes.status}` }, 502);
+    let normalised: Generated | null = null;
+    let problems: string[] = [];
+    let totalUsage: Record<string, unknown> | null = null;
+    let attempts = 0;
+
+    for (attempts = 1; attempts <= 2; attempts++) {
+      const aiRes = await fetch(COMET_ENDPOINT, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: MODEL, max_tokens: 2000, temperature: 0.4, messages }),
+      });
+
+      if (!aiRes.ok) {
+        const detail = await aiRes.text();
+        console.error('CometAPI error', aiRes.status, detail.slice(0, 500));
+        return json({ error: `Модель вернула ${aiRes.status}` }, 502);
+      }
+
+      const completion = await aiRes.json();
+      totalUsage = completion?.usage ?? totalUsage;
+      const raw = completion?.choices?.[0]?.message?.content ?? '';
+
+      let parsed;
+      try {
+        parsed = parseModelJson(raw);
+      } catch (_e) {
+        console.error('Unparseable model output:', raw.slice(0, 500));
+        return json({ error: 'Модель вернула неразбираемый ответ, попробуй ещё раз' }, 502);
+      }
+
+      normalised = {
+        seo_title: String(parsed.seo_title ?? '').trim(),
+        seo_description: String(parsed.seo_description ?? '').trim(),
+        focus_keyword: String(parsed.focus_keyword ?? '').trim(),
+        keywords: Array.isArray(parsed.keywords)
+          ? parsed.keywords.map((k: unknown) => String(k).trim()).filter(Boolean)
+          : [],
+        tldr: String(parsed.tldr ?? '').trim(),
+        faq: Array.isArray(parsed.faq)
+          ? parsed.faq
+              .map((f: { question?: unknown; answer?: unknown }) => ({
+                question: String(f?.question ?? '').trim(),
+                answer: String(f?.answer ?? '').trim(),
+              }))
+              .filter((f: { question: string; answer: string }) => f.question && f.answer)
+          : [],
+      };
+
+      problems = validate(normalised, content);
+      if (!problems.length) break;
+
+      // Hand the failures back verbatim — a targeted fix beats a blind rerun.
+      if (attempts === 1) {
+        console.log('validation failed, retrying:', problems.join('; '));
+        messages.push({ role: 'assistant', content: raw });
+        messages.push({
+          role: 'user',
+          content: `Исправь и верни ТОЛЬКО JSON того же формата:\n- ${problems.join('\n- ')}`,
+        });
+      }
     }
 
-    const completion = await aiRes.json();
-    const raw = completion?.choices?.[0]?.message?.content ?? '';
-
-    let parsed;
-    try {
-      parsed = parseModelJson(raw);
-    } catch (_e) {
-      console.error('Unparseable model output:', raw.slice(0, 500));
-      return json({ error: 'Модель вернула неразбираемый ответ, попробуй ещё раз' }, 502);
-    }
-
-    // Normalise so the client always gets the same shape.
     return json({
-      seo_title: String(parsed.seo_title ?? '').trim(),
-      seo_description: String(parsed.seo_description ?? '').trim(),
-      focus_keyword: String(parsed.focus_keyword ?? '').trim(),
-      keywords: Array.isArray(parsed.keywords)
-        ? parsed.keywords.map((k: unknown) => String(k).trim()).filter(Boolean)
-        : [],
-      tldr: String(parsed.tldr ?? '').trim(),
-      faq: Array.isArray(parsed.faq)
-        ? parsed.faq
-            .map((f: { question?: unknown; answer?: unknown }) => ({
-              question: String(f?.question ?? '').trim(),
-              answer: String(f?.answer ?? '').trim(),
-            }))
-            .filter((f: { question: string; answer: string }) => f.question && f.answer)
-        : [],
-      usage: completion?.usage ?? null,
+      ...normalised,
+      usage: totalUsage,
       model: MODEL,
+      attempts,
+      // Surfaced so the editor can flag anything still off after the retry
+      // instead of silently saving it.
+      warnings: problems,
     });
   } catch (err) {
     console.error('generate-seo failed', err);
