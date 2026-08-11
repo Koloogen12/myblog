@@ -72,17 +72,20 @@ def build_sitemap(posts: list, categories: list) -> str:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     # (path, lastmod, changefreq, priority)
+    # Priorities reflect where the SEO value actually is. "/" is the mobile
+    # link-hub — a few links, almost no text — while /blog and the articles
+    # are what people search for and what AI engines quote.
     entries: List[Tuple[str, str, str, str]] = [
-        ("/", today, "weekly", "1.0"),
-        ("/blog", today, "daily", "0.9"),
-        ("/about", today, "monthly", "0.7"),
+        ("/blog", today, "daily", "1.0"),
+        ("/", today, "weekly", "0.8"),
+        ("/about", today, "monthly", "0.8"),
         ("/projects", today, "weekly", "0.7"),
     ]
     for c in sorted(categories, key=lambda x: x.get("sort_order") or 0):
         entries.append((f"/tag/{c['slug']}", today, "weekly", "0.6"))
     for p in posts:
         lastmod = iso_date(p.get("updated_at") or p.get("published_at"))
-        entries.append((f"/post/{p['slug']}", lastmod, "monthly", "0.8"))
+        entries.append((f"/post/{p['slug']}", lastmod, "monthly", "0.9"))
 
     lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
