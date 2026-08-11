@@ -278,6 +278,9 @@ const PostEditor = () => {
           fallbackTitle={title}
           fallbackDescription={excerpt}
           slug={slug}
+          articleTitle={title}
+          articleContent={editor?.getText() ?? ''}
+          articleCategory={category}
         />
       </MetadataSidebar>
     </div>

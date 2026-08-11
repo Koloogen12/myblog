@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Sparkles, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 import type { FaqItem } from '@/types';
 
 /** Everything the SEO panel owns, kept as one object so PostEditor can pass
@@ -24,6 +27,10 @@ interface SeoPanelProps {
   fallbackTitle: string;
   fallbackDescription: string;
   slug: string;
+  /** Article title/body, sent to the generator. */
+  articleTitle?: string;
+  articleContent?: string;
+  articleCategory?: string;
 }
 
 // Google truncates around these lengths; past them the tail is simply lost.
@@ -53,9 +60,60 @@ const SeoPanel = ({
   fallbackTitle,
   fallbackDescription,
   slug,
+  articleTitle,
+  articleContent,
+  articleCategory,
 }: SeoPanelProps) => {
+  const [generating, setGenerating] = useState(false);
+
   const set = <K extends keyof SeoFields>(key: K, v: SeoFields[K]) =>
     onChange({ ...value, [key]: v });
+
+  /**
+   * Ask the edge function for metadata. The model key lives in Supabase
+   * secrets, so nothing sensitive is reachable from here — we just pass the
+   * article and the caller's session.
+   */
+  const generate = async () => {
+    const title = articleTitle?.trim();
+    const content = articleContent?.trim();
+    if (!title || !content) {
+      toast({
+        title: 'Сначала заголовок и текст',
+        description: 'Генератор читает саму статью — без неё ему не с чем работать.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-seo', {
+        body: { title, content, category: articleCategory },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      // Merge rather than overwrite: anything already written by hand wins.
+      onChange({
+        seo_title: value.seo_title || data.seo_title || '',
+        seo_description: value.seo_description || data.seo_description || '',
+        focus_keyword: value.focus_keyword || data.focus_keyword || '',
+        keywords: value.keywords.length ? value.keywords : data.keywords || [],
+        tldr: value.tldr || data.tldr || '',
+        faq: value.faq.length ? value.faq : data.faq || [],
+      });
+      toast({ title: 'Метаданные готовы', description: 'Проверь и поправь, где нужно.' });
+    } catch (e) {
+      toast({
+        title: 'Не удалось сгенерировать',
+        description: e instanceof Error ? e.message : 'Попробуй ещё раз',
+        variant: 'destructive',
+      });
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const previewTitle = value.seo_title || fallbackTitle || 'Заголовок статьи';
   const previewDesc =
@@ -76,6 +134,26 @@ const SeoPanel = ({
           Пустые поля берутся из заголовка и описания статьи
         </p>
       </div>
+
+      <Button
+        onClick={generate}
+        disabled={generating}
+        size="sm"
+        className="w-full gap-1.5"
+      >
+        {generating ? (
+          <>
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Читаю статью…
+          </>
+        ) : (
+          <>
+            <Sparkles className="w-3.5 h-3.5" /> Сгенерировать SEO
+          </>
+        )}
+      </Button>
+      <p className="text-[11px] text-muted-foreground -mt-2">
+        Заполнит только пустые поля — то, что написал руками, останется как есть.
+      </p>
 
       {/* Live SERP preview — the fastest way to see what actually gets shown. */}
       <div className="rounded-lg border border-border bg-secondary/20 p-3">
