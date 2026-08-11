@@ -29,6 +29,8 @@ interface MetadataSidebarProps {
   isSaving: boolean;
   onSave: () => void;
   onPublish: () => void;
+  /** Extra sections rendered at the bottom of the sidebar (e.g. SEO panel). */
+  children?: React.ReactNode;
 }
 
 function formatTime(date: Date): string {
@@ -57,6 +59,7 @@ const MetadataSidebar = ({
   isSaving,
   onSave,
   onPublish,
+  children,
 }: MetadataSidebarProps) => {
   const { data: categories = [] } = useCategories();
 
@@ -179,6 +182,12 @@ const MetadataSidebar = ({
             </div>
           </div>
         </div>
+          {children && (
+            <>
+              <Separator />
+              {children}
+            </>
+          )}
       </ScrollArea>
 
       {/* Bottom actions */}

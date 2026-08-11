@@ -24,7 +24,7 @@ export function usePosts(filters?: { is_published?: boolean; category?: string }
   return useQuery({
     queryKey: ['posts', filters],
     queryFn: async () => {
-      let query = supabase.from('posts').select('id, title, slug, content, content_html, excerpt, cover_image_url, category, rating, reading_time, is_published, published_at, created_at, updated_at');
+      let query = supabase.from('posts').select('id, title, slug, content, content_html, excerpt, cover_image_url, category, rating, reading_time, is_published, published_at, created_at, updated_at, seo_title, seo_description, keywords, focus_keyword, tldr, faq, og_image, seo_generated_at');
       if (filters?.is_published !== undefined) {
         query = query.eq('is_published', filters.is_published);
       }
@@ -44,7 +44,7 @@ export function usePost(slug: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('posts')
-        .select('id, title, slug, content, content_html, excerpt, cover_image_url, category, rating, reading_time, is_published, published_at, created_at, updated_at')
+        .select('id, title, slug, content, content_html, excerpt, cover_image_url, category, rating, reading_time, is_published, published_at, created_at, updated_at, seo_title, seo_description, keywords, focus_keyword, tldr, faq, og_image, seo_generated_at')
         .eq('slug', slug)
         .single();
       if (error) throw error;

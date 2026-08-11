@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import TipTapEditor from '@/components/admin/editor/TipTapEditor';
 import OutlinePanel from '@/components/admin/editor/OutlinePanel';
 import MetadataSidebar from '@/components/admin/editor/MetadataSidebar';
+import SeoPanel, { type SeoFields } from '@/components/admin/editor/SeoPanel';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import type { Editor } from '@tiptap/react';
 
@@ -44,6 +45,14 @@ const PostEditor = () => {
   const [rating, setRating] = useState(0);
   const [coverUrl, setCoverUrl] = useState('');
   const [isPublished, setIsPublished] = useState(false);
+  const [seo, setSeo] = useState<SeoFields>({
+    seo_title: '',
+    seo_description: '',
+    focus_keyword: '',
+    keywords: [],
+    tldr: '',
+    faq: [],
+  });
   const [initialized, setInitialized] = useState(false);
 
   const editorRef = useRef<Editor | null>(null);
@@ -68,6 +77,14 @@ const PostEditor = () => {
       setRating(existingPost.rating || 0);
       setCoverUrl(existingPost.cover_image_url || '');
       setIsPublished(existingPost.is_published || false);
+      setSeo({
+        seo_title: existingPost.seo_title || '',
+        seo_description: existingPost.seo_description || '',
+        focus_keyword: existingPost.focus_keyword || '',
+        keywords: existingPost.keywords || [],
+        tldr: existingPost.tldr || '',
+        faq: existingPost.faq || [],
+      });
       setInitialized(true);
     }
   }, [existingPost, initialized]);
@@ -133,6 +150,14 @@ const PostEditor = () => {
       reading_time: readingTime,
       is_published: shouldPublish,
       published_at: shouldPublish ? new Date().toISOString() : undefined,
+      // Empty -> null so the site falls back to title/excerpt instead of
+      // rendering blank meta tags.
+      seo_title: seo.seo_title.trim() || null,
+      seo_description: seo.seo_description.trim() || null,
+      focus_keyword: seo.focus_keyword.trim() || null,
+      keywords: seo.keywords,
+      tldr: seo.tldr.trim() || null,
+      faq: seo.faq.filter(f => f.question.trim() && f.answer.trim()),
     };
 
     try {
@@ -246,7 +271,15 @@ const PostEditor = () => {
         isSaving={isSaving}
         onSave={handleSaveDraft}
         onPublish={handlePublish}
-      />
+      >
+        <SeoPanel
+          value={seo}
+          onChange={v => { setSeo(v); autoSaveControls.markDirty(); }}
+          fallbackTitle={title}
+          fallbackDescription={excerpt}
+          slug={slug}
+        />
+      </MetadataSidebar>
     </div>
   );
 };

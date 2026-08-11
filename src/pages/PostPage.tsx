@@ -67,28 +67,84 @@ const PostPage = () => {
     year: 'numeric',
   });
 
-  const jsonLd = {
+  // SEO fields override the editorial ones when filled, so the SERP snippet
+  // can differ from the on-page headline without touching the article itself.
+  const metaTitle = post.seo_title || post.title;
+  const metaDescription = post.seo_description || post.tldr || post.excerpt;
+  const socialImage = proxyUrl(post.og_image || post.cover_image_url);
+  const faqItems = (post.faq ?? []).filter(f => f?.question && f?.answer);
+  const wasUpdated =
+    post.updated_at &&
+    post.published_at &&
+    new Date(post.updated_at).getTime() - new Date(post.published_at).getTime() >
+      24 * 60 * 60 * 1000;
+
+  const articleSchema = {
     '@context': 'https://schema.org',
     '@type': 'BlogPosting',
-    headline: post.title,
-    description: post.excerpt,
+    headline: metaTitle,
+    description: metaDescription,
     datePublished: post.published_at,
     dateModified: post.updated_at,
     author: { '@type': 'Person', name: 'Данил Кочнев', url: 'https://dkochnev.com/about' },
     publisher: { '@type': 'Person', name: 'Данил Кочнев' },
     mainEntityOfPage: `https://dkochnev.com/post/${post.slug}`,
-    ...(post.cover_image_url ? { image: proxyUrl(post.cover_image_url) } : {}),
+    inLanguage: locale === 'en' ? 'en' : 'ru',
+    ...(post.reading_time ? { timeRequired: `PT${post.reading_time}M` } : {}),
+    ...(post.keywords?.length ? { keywords: post.keywords.join(', ') } : {}),
+    ...(socialImage ? { image: socialImage } : {}),
   };
+
+  // Breadcrumbs give search engines the hierarchy and render as a path in
+  // results instead of a bare URL.
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Блог', item: 'https://dkochnev.com/blog' },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: categoryMap[post.category] || post.category,
+        item: `https://dkochnev.com/tag/${post.category}`,
+      },
+      {
+        '@type': 'ListItem',
+        position: 3,
+        name: post.title,
+        item: `https://dkochnev.com/post/${post.slug}`,
+      },
+    ],
+  };
+
+  // FAQPage is one of the highest-leverage schemas for AI answer engines:
+  // it hands them ready-made question/answer pairs to quote.
+  const faqSchema = faqItems.length
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: faqItems.map(f => ({
+          '@type': 'Question',
+          name: f.question,
+          acceptedAnswer: { '@type': 'Answer', text: f.answer },
+        })),
+      }
+    : null;
+
+  const jsonLd = [articleSchema, breadcrumbSchema, ...(faqSchema ? [faqSchema] : [])];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <ReadingProgress />
       <SEOHead
-        title={post.title}
-        description={post.excerpt}
-        ogImage={proxyUrl(post.cover_image_url)}
+        title={metaTitle}
+        description={metaDescription}
+        keywords={post.keywords?.length ? post.keywords.join(', ') : undefined}
+        ogImage={socialImage}
         ogType="article"
         path={`/post/${post.slug}`}
+        publishedTime={post.published_at}
+        modifiedTime={post.updated_at}
         jsonLd={jsonLd}
       />
       <Header />
@@ -110,6 +166,20 @@ const PostPage = () => {
             <span>{formattedDate}</span>
             <span>·</span>
             <span>{t('common.readMinutesShort', { count: post.reading_time || 0 })}</span>
+            {/* Freshness is weighted heavily by AI answer engines, so an
+                updated article says so explicitly. */}
+            {wasUpdated && (
+              <>
+                <span>·</span>
+                <span>
+                  {t('post.updatedOn')}{' '}
+                  {new Date(post.updated_at).toLocaleDateString(
+                    locale === 'en' ? 'en-US' : 'ru-RU',
+                    { day: 'numeric', month: 'long', year: 'numeric' },
+                  )}
+                </span>
+              </>
+            )}
           </div>
 
           <h1 className="text-3xl font-bold mb-2">{post.title}</h1>
@@ -127,10 +197,42 @@ const PostPage = () => {
           </div>
         </motion.div>
 
+        {/* TL;DR — a self-contained 40-60 word answer placed above the fold.
+            AI systems extract passages, not pages, so leading with a complete
+            answer is what makes a post quotable. */}
+        {post.tldr && (
+          <aside className="mb-8 rounded-xl border border-primary/20 bg-primary/5 p-5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-primary mb-2">
+              {t('post.tldr')}
+            </p>
+            <p className="text-[15px] leading-relaxed text-foreground/90">{post.tldr}</p>
+          </aside>
+        )}
+
         <TableOfContents contentHtml={post.content_html} />
         <div>
           <PostContent content={post.content} contentHtml={post.content_html} />
         </div>
+
+        {/* FAQ — mirrors the FAQPage schema emitted above. Real questions in
+            natural language, because that's how people query AI assistants. */}
+        {faqItems.length > 0 && (
+          <section className="mt-12 pt-8 border-t border-border">
+            <h2 className="text-2xl font-bold font-display mb-6">{t('post.faqHeading')}</h2>
+            <div className="space-y-5">
+              {faqItems.map((f, i) => (
+                <div key={i}>
+                  <h3 className="text-base font-semibold text-foreground mb-1.5">
+                    {f.question}
+                  </h3>
+                  <p className="text-[15px] leading-relaxed text-muted-foreground">
+                    {f.answer}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Subscribe CTA */}
         <div className="mt-12">

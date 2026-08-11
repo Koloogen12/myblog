@@ -1,3 +1,9 @@
+/** One question/answer pair; powers the FAQ block and FAQPage schema. */
+export interface FaqItem {
+  question: string;
+  answer: string;
+}
+
 export interface Post {
   id: string;
   title: string;
@@ -14,6 +20,24 @@ export interface Post {
   published_at?: string;
   created_at: string;
   updated_at: string;
+
+  // ── SEO / GEO ───────────────────────────────────────────────────────────
+  /** Overrides <title>; falls back to `title`. Target <= 60 chars. */
+  seo_title?: string | null;
+  /** Overrides meta description; falls back to `excerpt`. Target <= 160. */
+  seo_description?: string | null;
+  /** Target keywords — for topical mapping, NOT for stuffing into copy. */
+  keywords?: string[] | null;
+  /** The single query this post is meant to win. */
+  focus_keyword?: string | null;
+  /** 40-60 word self-contained summary; what AI engines quote. */
+  tldr?: string | null;
+  /** Q&A pairs rendered as an FAQ block and emitted as FAQPage schema. */
+  faq?: FaqItem[] | null;
+  /** Per-post social image; falls back to `cover_image_url`. */
+  og_image?: string | null;
+  /** When the AI generator last filled these fields. */
+  seo_generated_at?: string | null;
 }
 
 export interface CategoryInfo {

@@ -54,7 +54,10 @@
     "prev": "Previous",
     "next": "Next",
     "allPosts": "All posts",
-    "notFound": "Post not found"
+    "notFound": "Post not found",
+    "tldr": "In short",
+    "faqHeading": "Frequently asked questions",
+    "updatedOn": "updated"
   },
   "about": {
     "metaTitle": "About me"
