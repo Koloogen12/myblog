@@ -1,0 +1,18 @@
+{
+  "name": "Данил Кочнев — IT-предприниматель",
+  "short_name": "Кочнев",
+  "description": "Serial founder из Москвы. Пишу о продуктах, стартапах и реальности фаундера.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#faf7f2",
+  "theme_color": "#f97316",
+  "orientation": "portrait-primary",
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}

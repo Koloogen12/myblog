@@ -1,0 +1,72 @@
+{
+  "header": {
+    "blog": "Блог",
+    "projects": "Проекты",
+    "ideaToMvp": "От идеи до MVP",
+    "consultation": "Консультация",
+    "toggleTheme": "Переключить тему"
+  },
+  "footer": {
+    "tagline": "Серийный IT-предприниматель",
+    "brandSubline": "Серийный IT-предприниматель с 2018 года.\nПишу о продуктах, мышлении и принципах.",
+    "categories": "Рубрики",
+    "socials": "Соцсети",
+    "copyright": "© {{year}} Данил Кочнев. Все права защищены.",
+    "name": "Данил Кочнев",
+    "projects": "Проекты",
+    "about": "Обо мне"
+  },
+  "sidebar": {
+    "categories": "Категории",
+    "telegramChannel": "Канал в Telegram:",
+    "socials": "Соцсети",
+    "aboutMe": "обо мне"
+  },
+  "common": {
+    "loading": "Загрузка…",
+    "notFoundTitle": "Страница не найдена",
+    "notFoundBody": "Такой страницы не существует. Возможно, она была удалена или вы ошиблись в адресе.",
+    "search": "Поиск",
+    "searchPlaceholder": "Поиск по постам…",
+    "readMinutes": "читать {{count}} мин",
+    "readMinutesShort": "{{count}} мин чтения",
+    "back": "Назад",
+    "backHome": "← На главную",
+    "openExternal": "Открыть",
+    "language": "Язык",
+    "russian": "Русский",
+    "english": "English"
+  },
+  "blog": {
+    "metaTitle": "Блог о продуктах, стартапах и AI",
+    "metaDescription": "Блог Данила Кочнева — серийного IT-предпринимателя. Мысли, кейсы и опыт построения продуктов.",
+    "sortNewest": "Новые",
+    "sortOldest": "Старые",
+    "sortReadingTime": "По длине",
+    "noPosts": "Постов пока нет",
+    "noSearchResults": "По запросу ничего не найдено"
+  },
+  "post": {
+    "relatedPosts": "Похожие посты",
+    "publishedOn": "Опубликовано",
+    "share": "Поделиться",
+    "tableOfContents": "Оглавление",
+    "prev": "Предыдущий",
+    "next": "Следующий",
+    "allPosts": "Все посты",
+    "notFound": "Пост не найден"
+  },
+  "about": {
+    "metaTitle": "Обо мне"
+  },
+  "projects": {
+    "active": "Активные проекты",
+    "archive": "Запущенные ранее",
+    "status": {
+      "active": "В активной разработке",
+      "growth": "Растёт",
+      "launched": "Запущен",
+      "archive": "Архив"
+    }
+  }
+}

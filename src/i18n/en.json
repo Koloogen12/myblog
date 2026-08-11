@@ -1,0 +1,72 @@
+{
+  "header": {
+    "blog": "Blog",
+    "projects": "Projects",
+    "ideaToMvp": "Idea to MVP",
+    "consultation": "Booking",
+    "toggleTheme": "Toggle theme"
+  },
+  "footer": {
+    "tagline": "Serial IT founder",
+    "brandSubline": "Serial IT founder since 2018.\nWriting about products, thinking and principles.",
+    "categories": "Topics",
+    "socials": "Social",
+    "copyright": "© {{year}} Danil Kochnev. All rights reserved.",
+    "name": "Danil Kochnev",
+    "projects": "Projects",
+    "about": "About"
+  },
+  "sidebar": {
+    "categories": "Categories",
+    "telegramChannel": "Telegram channel:",
+    "socials": "Social",
+    "aboutMe": "about me"
+  },
+  "common": {
+    "loading": "Loading…",
+    "notFoundTitle": "Page not found",
+    "notFoundBody": "This page doesn't exist. It may have been removed, or the URL might be wrong.",
+    "search": "Search",
+    "searchPlaceholder": "Search posts…",
+    "readMinutes": "{{count}} min read",
+    "readMinutesShort": "{{count}} min read",
+    "back": "Back",
+    "backHome": "← Home",
+    "openExternal": "Open",
+    "language": "Language",
+    "russian": "Русский",
+    "english": "English"
+  },
+  "blog": {
+    "metaTitle": "Notes on products, startups & AI",
+    "metaDescription": "Notes by Danil Kochnev — serial IT founder. Lessons from building products, hiring, and shipping.",
+    "sortNewest": "Newest",
+    "sortOldest": "Oldest",
+    "sortReadingTime": "By length",
+    "noPosts": "No posts yet",
+    "noSearchResults": "No results"
+  },
+  "post": {
+    "relatedPosts": "Related posts",
+    "publishedOn": "Published",
+    "share": "Share",
+    "tableOfContents": "Table of contents",
+    "prev": "Previous",
+    "next": "Next",
+    "allPosts": "All posts",
+    "notFound": "Post not found"
+  },
+  "about": {
+    "metaTitle": "About me"
+  },
+  "projects": {
+    "active": "Active",
+    "archive": "Archived",
+    "status": {
+      "active": "In active development",
+      "growth": "Growing",
+      "launched": "Launched",
+      "archive": "Archived"
+    }
+  }
+}
