@@ -1,0 +1,75 @@
+# dkochnev.com — личный сайт и блог. Vite SPA + админка, бэкенд внешний
+# (Supabase). Наружу этот Caddy не смотрит: общий caddy-caddy-1 проксирует
+# сюда по имени контейнера. Здесь живёт вся логика сайта, чтобы не раздувать
+# общий Caddyfile — его правка это отдельный риск для соседей.
+{
+	admin off
+	auto_https off
+}
+
+:80 {
+	log {
+		output stdout
+		format console
+	}
+	encode zstd gzip
+
+	# ------------------------------------------------------------------
+	# Supabase через свой origin: /supabase/* -> <project>.supabase.co/*
+	# Часть российских провайдеров режет *.supabase.co, поэтому браузер
+	# ходит на dkochnev.com, а до Supabase достукивается уже сервер.
+	# handle_path сам срезает префикс: /supabase/rest/v1/x -> /rest/v1/x
+	# ------------------------------------------------------------------
+	handle_path /supabase/* {
+		request_body {
+			max_size 50MB
+		}
+		reverse_proxy https://mxttoiqtviaobotoekxw.supabase.co {
+			# Хост подменяем, иначе роутер Supabase не узнает проект.
+			header_up Host mxttoiqtviaobotoekxw.supabase.co
+			header_up X-Forwarded-Proto https
+			# Иначе cookie выставляется на supabase.co и до нас не доедет.
+			header_down Set-Cookie "[Dd]omain=[^;]+" "Domain=dkochnev.com"
+			# Realtime по вебсокетам и SSE не должны буферизоваться.
+			flush_interval -1
+			transport http {
+				read_timeout 3600s
+				write_timeout 3600s
+			}
+		}
+	}
+
+	handle {
+		root * /srv
+
+		# Только /assets/* содержит хеш в имени и потому вечен. Остальные
+		# картинки лежат под своими именами: если их закешировать намертво,
+		# подмена файла больше никогда не доедет до браузера.
+		@hashed path /assets/*
+		@unhashed not path /assets/*
+		header @hashed Cache-Control "public, max-age=31536000, immutable"
+		header @unhashed Cache-Control "no-cache"
+
+		# Краулеры не исполняют JS и увидели бы пустую оболочку. Отдаём им
+		# снапшот из той же базы, что читает SPA, — это dynamic rendering.
+		@bot header_regexp User-Agent "(?i)googlebot|bingbot|yandex(bot|webmaster)|duckduckbot|baiduspider|slurp|gptbot|chatgpt-user|oai-searchbot|perplexitybot|perplexity-user|claudebot|claude-user|anthropic-ai|google-extended|applebot|amazonbot|meta-externalagent|bytespider|youbot|diffbot|cohere-ai|twitterbot|facebookexternalhit|telegrambot|slackbot|discordbot|linkedinbot|whatsapp|vkshare|skypeuripreview|embedly"
+
+		# route, а не голый handle: внутри route директивы идут в том
+		# порядке, в каком записаны, а не в порядке Caddy по умолчанию.
+		handle @bot {
+			route {
+				@homepage path /
+				rewrite @homepage /prerender/index.html
+				@trail path_regexp trail ^(/.+)/$
+				rewrite @trail {re.trail.1}
+				try_files {path} /prerender{path}.html /index.html
+				file_server
+			}
+		}
+
+		handle {
+			try_files {path} /index.html
+			file_server
+		}
+	}
+}

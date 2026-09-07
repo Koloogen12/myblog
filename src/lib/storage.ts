@@ -1,13 +1,24 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_PROXY_PATH } from '@/integrations/supabase/client';
 
 const BUCKET = 'blog-images';
 
-// Legacy direct-to-supabase.co host. Any URL stored in the DB before we put
-// the nginx reverse proxy in front of Supabase will point at this host.
-// Russian ISPs block it, so we rewrite to same-origin on render.
-const LEGACY_SUPABASE_HOST = 'https://mxttoiqtviaobotoekxw.supabase.co';
-const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL || 'https://dkochnev.com/supabase';
+// Absolute hosts baked into old DB rows, normalised onto whatever origin the
+// app is actually served from. supabase.co is blocked by some Russian ISPs;
+// the two dkochnev.com forms are older proxy URLs — rewriting them keeps the
+// www variant and any preview host pointing at the right place. On the apex
+// host the rewrite is a no-op, which is exactly what we want.
+const LEGACY_HOSTS = [
+  'https://mxttoiqtviaobotoekxw.supabase.co',
+  'https://dkochnev.com/supabase',
+  'https://www.dkochnev.com/supabase',
+];
+
+function proxyBase(): string {
+  const fromEnv = import.meta.env.VITE_SUPABASE_URL;
+  if (fromEnv) return fromEnv;
+  if (typeof window !== 'undefined') return window.location.origin + SUPABASE_PROXY_PATH;
+  return 'https://mxttoiqtviaobotoekxw.supabase.co';
+}
 
 /**
  * Rewrite any legacy direct-to-supabase.co URL onto our same-origin proxy.
@@ -15,8 +26,9 @@ const SUPABASE_URL =
  */
 export function proxyUrl(url: string | null | undefined): string | undefined {
   if (!url) return undefined;
-  if (url.startsWith(LEGACY_SUPABASE_HOST)) {
-    return SUPABASE_URL + url.slice(LEGACY_SUPABASE_HOST.length);
+  const base = proxyBase();
+  for (const legacy of LEGACY_HOSTS) {
+    if (url.startsWith(legacy)) return base + url.slice(legacy.length);
   }
   return url;
 }
@@ -27,8 +39,12 @@ export function proxyUrl(url: string | null | undefined): string | undefined {
  */
 export function rewriteLegacySupabaseUrls(html: string): string {
   if (!html) return html;
-  if (!html.includes(LEGACY_SUPABASE_HOST)) return html;
-  return html.split(LEGACY_SUPABASE_HOST).join(SUPABASE_URL);
+  const base = proxyBase();
+  let out = html;
+  for (const legacy of LEGACY_HOSTS) {
+    if (out.includes(legacy)) out = out.split(legacy).join(base);
+  }
+  return out;
 }
 
 /**

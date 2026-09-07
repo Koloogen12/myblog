@@ -5,13 +5,26 @@ import type { Database } from './types';
 // Anon key is public by design (protected by RLS). Hardcoded to avoid
 // build-time env var issues with containerized deployments.
 //
-// SUPABASE_URL points at a same-origin nginx reverse proxy
-// (sites-available/dkochnev → /supabase/* → mxttoiqtviaobotoekxw.supabase.co/*).
-// We proxy because Russian ISPs intermittently block *.supabase.co; going
-// via dkochnev.com (Selectel) makes the site usable without a VPN.
-// Override with VITE_SUPABASE_URL=https://mxttoiqtviaobotoekxw.supabase.co
-// for local dev that doesn't have the nginx proxy.
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://dkochnev.com/supabase';
+// Supabase is reached through a SAME-ORIGIN /supabase/* reverse proxy, never
+// directly: Russian ISPs intermittently block *.supabase.co, so the browser
+// talks to our own host and the server makes the hop. The proxy is declared
+// per host — on Hetzner in /opt/stacks/dkochnev/caddy/Caddyfile.
+//
+// The origin is resolved at RUNTIME, so one build serves dkochnev.com, a
+// preview host and localhost without a rebuild. supabase-js rejects relative
+// URLs, hence origin + path rather than a bare '/supabase'. Override with
+// VITE_SUPABASE_URL=https://mxttoiqtviaobotoekxw.supabase.co for local dev
+// that has no proxy in front.
+export const SUPABASE_PROXY_PATH = '/supabase';
+
+function resolveSupabaseUrl(): string {
+  const fromEnv = import.meta.env.VITE_SUPABASE_URL;
+  if (fromEnv) return fromEnv;
+  if (typeof window !== 'undefined') return window.location.origin + SUPABASE_PROXY_PATH;
+  return 'https://mxttoiqtviaobotoekxw.supabase.co';
+}
+
+const SUPABASE_URL = resolveSupabaseUrl();
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14dHRvaXF0dmlhb2JvdG9la3h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzNDQ0MjIsImV4cCI6MjA5MDkyMDQyMn0.bOmVtAGkUR6wY1ADfR3FtgP0f3CiFjcQs5WIp1LrKeI';
 
 // Import the supabase client like this:

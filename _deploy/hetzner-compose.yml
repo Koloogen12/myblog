@@ -1,0 +1,17 @@
+name: dkochnev
+services:
+  web:
+    image: caddy:2-alpine
+    # Образ уже есть на машине (его использует zoria) — новых слоёв на диск
+    # не кладём, а диск занят на 85%.
+    volumes:
+      - ./site:/srv:ro
+      # Каталогом, а не файлом: одиночный bind-mount файла рвёт связь по
+      # inode при перезаписи. Именно так 2026-09-04 лёг общий Caddy.
+      - ./caddy:/etc/caddy:ro
+    restart: unless-stopped
+    # Портов на хост нет: наружу только через общий Caddy.
+    networks: [edge]
+networks:
+  edge:
+    external: true
